@@ -18,76 +18,54 @@
 */
 
 extern "C" {
-  #include "utility/wl_definitions.h"
-  #include "utility/wl_types.h"
-  #include "string.h"
-  #include "utility/debug.h"
+#include "string.h"
+#include "utility/debug.h"
+#include "utility/wifi_spi.h"
+#include "utility/wl_definitions.h"
 }
 
 #include "WiFi.h"
 #include "WiFiClient.h"
 #include "WiFiServer.h"
-#include "utility/server_drv.h"
+#include "logging.h"
+#include <assert.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
 
-
-uint16_t WiFiClient::_srcport = 1024;
-
-WiFiClient::WiFiClient() : _sock(MAX_SOCK_NUM) {
+WiFiClient::WiFiClient(int sock) : psock(sock) {
+  if (psock) {
+    int flags = fcntl(psock, F_GETFL, 0);
+    fcntl(psock, F_SETFL, flags | O_NONBLOCK);
+    errorCode = 0;
+  }
 }
 
-WiFiClient::WiFiClient(uint8_t sock) : _sock(sock) {
-}
-
-int WiFiClient::connect(const char* host, uint16_t port) {
-	IPAddress remote_addr;
-	if (WiFi.hostByName(host, remote_addr))
-	{
-		return connect(remote_addr, port);
-	}
-	return 0;
+int WiFiClient::connect(const char *host, uint16_t port) {
+  notImplemented("WiFiClient::connect");
+  return 0;
 }
 
 int WiFiClient::connect(IPAddress ip, uint16_t port) {
-    _sock = getFirstSocket();
-    if (_sock != NO_SOCKET_AVAIL)
-    {
-    	ServerDrv::startClient(uint32_t(ip), port, _sock);
-    	WiFiClass::_state[_sock] = _sock;
-
-    	unsigned long start = millis();
-
-    	// wait 4 second for the connection to close
-    	while (!connected() && millis() - start < 10000)
-    		delay(1);
-
-    	if (!connected())
-       	{
-    		return 0;
-    	}
-    }else{
-    	Serial.println("No Socket available");
-    	return 0;
-    }
-    return 1;
+  notImplemented("WiFiClient::connect");
+  return 0;
 }
 
-size_t WiFiClient::write(uint8_t b) {
-	  return write(&b, 1);
-}
+size_t WiFiClient::write(uint8_t b) { return write(&b, 1); }
 
 size_t WiFiClient::write(const uint8_t *buf, size_t size) {
-  if (_sock >= MAX_SOCK_NUM)
-  {
-	  setWriteError();
-	  return 0;
+  if (!psock) {
+    setWriteError();
+    return 0;
   }
-  if (size==0)
-  {
-	  setWriteError();
-      return 0;
+  if (size == 0) {
+    setWriteError();
+    return 0;
   }
 
+  ::write(psock, buf, size);
 
+#if 0
   if (!ServerDrv::sendData(_sock, buf, size))
   {
 	  setWriteError();
@@ -98,102 +76,91 @@ size_t WiFiClient::write(const uint8_t *buf, size_t size) {
 	  setWriteError();
       return 0;
   }
+#endif
 
   return size;
 }
 
 int WiFiClient::available() {
-  if (_sock != 255)
-  {
-      return ServerDrv::availData(_sock);
+  if (psock) {
+    if (ready == -1) { // No char already read, ask the OS
+      uint8_t b;
+      int numread = ::read(psock, &b, 1);
+      if (numread < 1) {
+        errorCode = errno;
+        // EAGAIN means timeout
+        if (errorCode == EAGAIN)
+          errorCode = 0;
+
+        ready = -1;
+      } else {
+        ready = b;
+      }
+    }
+
+    int len = (ready == -1) ? 0 : 1;
+
+    // log(SysWifi, LogVerbose, "available %d", len);
+    return len;
   }
-   
+
   return 0;
 }
 
 int WiFiClient::read() {
+  char b;
+  if (!available())
+    return -1;
+
+  b = ready;
+  ready = -1; // consumed
+  return (uint8_t)b;
+}
+
+int WiFiClient::read(uint8_t *buf, size_t size) {
+  assert(psock);
+  // FIXME - this is super inefficient, instead do block reads from the file
+  // descriptor
+  auto r = ::read(psock, buf, size);
+  errorCode = errno;
+
+  return r;
+}
+
+int WiFiClient::peek() {
   uint8_t b;
   if (!available())
     return -1;
 
-  ServerDrv::getData(_sock, &b);
+  b = ready;
   return b;
 }
 
-
-int WiFiClient::read(uint8_t* buf, size_t size) {
-  // sizeof(size_t) is architecture dependent
-  // but we need a 16 bit data type here
-  uint16_t _size = size;
-  if (!ServerDrv::getDataBuf(_sock, buf, &_size))
-      return -1;
-  return 0;
-}
-
-int WiFiClient::peek() {
-	  uint8_t b;
-	  if (!available())
-	    return -1;
-
-	  ServerDrv::getData(_sock, &b, 1);
-	  return b;
-}
-
-void WiFiClient::flush() {
-  // TODO: a real check to ensure transmission has been completed
-}
+void WiFiClient::flush() { assert(psock); }
 
 void WiFiClient::stop() {
-
-  if (_sock == 255)
+  if (!psock)
     return;
 
-  ServerDrv::stopClient(_sock);
-  WiFiClass::_state[_sock] = NA_STATE;
-
-  int count = 0;
-  // wait maximum 5 secs for the connection to close
-  while (status() != CLOSED && ++count < 50)
-    delay(100);
-
-  _sock = 255;
+  ::close(psock);
+  psock = 0;
 }
 
 uint8_t WiFiClient::connected() {
 
-  if (_sock == 255) {
+  if (!psock) {
     return 0;
   } else {
-    uint8_t s = status();
-
-    return !(s == LISTEN || s == CLOSED || s == FIN_WAIT_1 ||
-    		s == FIN_WAIT_2 || s == TIME_WAIT ||
-    		s == SYN_SENT || s== SYN_RCVD ||
-    		(s == CLOSE_WAIT));
+    return errorCode == 0;
   }
 }
 
 uint8_t WiFiClient::status() {
-    if (_sock == 255) {
+  if (!psock) {
     return CLOSED;
   } else {
-    return ServerDrv::getClientState(_sock);
+    return ESTABLISHED;
   }
 }
 
-WiFiClient::operator bool() {
-  return _sock != 255;
-}
-
-// Private Methods
-uint8_t WiFiClient::getFirstSocket()
-{
-    for (int i = 0; i < MAX_SOCK_NUM; i++) {
-      if (WiFiClass::_state[i] == NA_STATE)
-      {
-          return i;
-      }
-    }
-    return SOCK_NOT_AVAIL;
-}
-
+WiFiClient::operator bool() { return connected(); }

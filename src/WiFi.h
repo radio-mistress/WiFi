@@ -22,14 +22,11 @@
 
 #include <inttypes.h>
 
-extern "C" {
-	#include "utility/wl_definitions.h"
-	#include "utility/wl_types.h"
-}
-
 #include "IPAddress.h"
 #include "WiFiClient.h"
 #include "WiFiServer.h"
+
+#define MAX_SOCK_NUM 4 // for portuino
 
 class WiFiClass
 {
@@ -45,12 +42,12 @@ public:
     /*
      * Get the first socket available
      */
-    static uint8_t getSocket();
+    // static uint8_t getSocket();
 
     /*
      * Get firmware version
      */
-    static char* firmwareVersion();
+    // static char* firmwareVersion();
 
 
     /* Start Wifi connection for OPEN networks

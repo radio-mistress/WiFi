@@ -18,91 +18,104 @@
 */
 
 #include <string.h>
-#include "utility/server_drv.h"
 
 extern "C" {
-  #include "utility/debug.h"
+#include "logging.h"
+#include "utility/debug.h"
+#include "utility/wifi_spi.h"
 }
 
 #include "WiFi.h"
 #include "WiFiClient.h"
 #include "WiFiServer.h"
 
-WiFiServer::WiFiServer(uint16_t port)
-{
-    _port = port;
+#include <fcntl.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <assert.h>
+
+WiFiServer::WiFiServer(uint16_t port) { _port = port; }
+
+WiFiServer::~WiFiServer() {
+  if (psock) {
+    ::close(psock);
+    psock = 0;
+  }
 }
 
-void WiFiServer::begin()
-{
-    uint8_t _sock = WiFiClass::getSocket();
-    if (_sock != NO_SOCKET_AVAIL)
-    {
-        ServerDrv::startServer(_port, _sock);
-        WiFiClass::_server_port[_sock] = _port;
-        WiFiClass::_state[_sock] = _sock;
+void WiFiServer::begin() {
+  // bind and listen
+
+  /* First call to socket() function */
+  psock = socket(AF_INET, SOCK_STREAM, 0);
+
+  if (psock < 0) {
+    log(SysWifi, LogError, "error opening socket");
+    psock = 0;
+  } else {
+    /* Initialize socket structure */
+    struct sockaddr_in serv_addr;
+    bzero((char *)&serv_addr, sizeof(serv_addr));
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(_port);
+
+    /* Now bind the host address using bind() call.*/
+    if (bind(psock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+      log(SysWifi, LogError, "failed to bind");
+    } else {
+
+      /* Now start listening for the clients, here process will
+       * go in sleep mode and will wait for the incoming connection
+       */
+
+      listen(psock, 5);
+
+      // Turn off blocking on accept()
+      int flags = fcntl(psock, F_GETFL, 0);
+      fcntl(psock, F_SETFL, flags | O_NONBLOCK);
     }
+  }
 }
 
-WiFiClient WiFiServer::available(byte* status)
-{
-	static int cycle_server_down = 0;
-	const int TH_SERVER_DOWN = 50;
+WiFiClient WiFiServer::available(byte *status) {
 
-    for (int sock = 0; sock < MAX_SOCK_NUM; sock++)
-    {
-        if (WiFiClass::_server_port[sock] == _port)
-        {
-        	WiFiClient client(sock);
-            uint8_t _status = client.status();
-            uint8_t _ser_status = this->status();
+  assert(psock);
+  log(SysWifi, LogVerbose, "calling accept");
 
-            if (status != NULL)
-            	*status = _status;
+  struct sockaddr_in cli_addr;
+  socklen_t clilen = sizeof(cli_addr);
 
-            //server not in listen state, restart it
-            if ((_ser_status == 0)&&(cycle_server_down++ > TH_SERVER_DOWN))
-            {
-            	ServerDrv::startServer(_port, sock);
-            	cycle_server_down = 0;
-            }
+  /* Accept actual connection from the client */
+  int s = accept(psock, (struct sockaddr *)&cli_addr, &clilen);
 
-            if (_status == ESTABLISHED)
-            {                
-                return client;  //TODO 
-            }
-        }
-    }
+  if (s < 0) {
+    log(SysWifi, LogError, "error on accept");
+    s = 0;
+  }
 
-    return WiFiClient(255);
+  log(SysWifi, LogVerbose, "accept=%d", s);
+
+  return WiFiClient(s);
 }
 
 uint8_t WiFiServer::status() {
-    return ServerDrv::getServerState(0);
+  notImplemented("WiFiServer::write");
+  return 0; // FIXME
 }
 
-
-size_t WiFiServer::write(uint8_t b)
-{
-    return write(&b, 1);
+size_t WiFiServer::write(uint8_t b) {
+  notImplemented("WiFiServer::write");
+  return 0;
 }
 
-size_t WiFiServer::write(const uint8_t *buffer, size_t size)
-{
-	size_t n = 0;
+size_t WiFiServer::write(const uint8_t *buffer, size_t size) {
+  size_t n = 0;
 
-    for (int sock = 0; sock < MAX_SOCK_NUM; sock++)
-    {
-        if (WiFiClass::_server_port[sock] != 0)
-        {
-        	WiFiClient client(sock);
-
-            if (WiFiClass::_server_port[sock] == _port &&
-                client.status() == ESTABLISHED)
-            {                
-                n+=client.write(buffer, size);
-            }
-        }
-    }
-    return n;
+  notImplemented("WiFiServer::writen");
+  portduinoDebug();
+  return n;
 }
