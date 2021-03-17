@@ -31,25 +31,6 @@ void WiFiClass::init()
 {
 }
 
-#if 0
-uint8_t WiFiClass::getSocket()
-{
-    for (uint8_t i = 0; i < MAX_SOCK_NUM; ++i)
-    {
-        if (WiFiClass::_server_port[i] == 0)
-        {
-             return i;
-        }
-    }
-    return NO_SOCKET_AVAIL;
-}
-
-char* WiFiClass::firmwareVersion()
-{
-	return "";
-}
-#endif
-
 int WiFiClass::begin(char* ssid)
 {
    return 0;

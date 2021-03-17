@@ -65,19 +65,6 @@ size_t WiFiClient::write(const uint8_t *buf, size_t size) {
 
   ::write(psock, buf, size);
 
-#if 0
-  if (!ServerDrv::sendData(_sock, buf, size))
-  {
-	  setWriteError();
-      return 0;
-  }
-  if (!ServerDrv::checkDataSent(_sock))
-  {
-	  setWriteError();
-      return 0;
-  }
-#endif
-
   return size;
 }
 
