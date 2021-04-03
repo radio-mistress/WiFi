@@ -19,9 +19,6 @@
 
 #include "WiFi.h"
 
-// XXX: don't make assumptions about the value of MAX_SOCK_NUM.
-int16_t 	WiFiClass::_state[MAX_SOCK_NUM] = { 0, 0, 0, 0 };
-uint16_t 	WiFiClass::_server_port[MAX_SOCK_NUM] = { 0, 0, 0, 0 };
 
 WiFiClass::WiFiClass()
 {
@@ -146,6 +143,11 @@ uint8_t WiFiClass::encryptionType(uint8_t networkItem)
 uint8_t WiFiClass::status()
 {
     return 0;
+}
+
+
+bool WiFiClass::isConnected() {
+    return true;
 }
 
 int WiFiClass::hostByName(const char* aHostname, IPAddress& aResult)

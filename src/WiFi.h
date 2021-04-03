@@ -34,8 +34,6 @@ private:
 
     static void init();
 public:
-    static int16_t 	_state[MAX_SOCK_NUM];
-    static uint16_t _server_port[MAX_SOCK_NUM];
 
     WiFiClass();
 
@@ -233,6 +231,9 @@ public:
      *          else error code
      */
     int hostByName(const char* aHostname, IPAddress& aResult);
+
+    // @return true if we have an internet connection (similar API to ESP32 version)
+    bool isConnected();
 
     friend class WiFiClient;
     friend class WiFiServer;
