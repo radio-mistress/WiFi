@@ -27,7 +27,7 @@
 class WiFiClient : public Client {
 
 public:
-  WiFiClient(int psock);
+  WiFiClient(int psock = 0);
 
   uint8_t status();
   virtual int connect(IPAddress ip, uint16_t port);
