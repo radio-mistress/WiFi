@@ -28,10 +28,13 @@ extern "C" {
 #include "WiFiClient.h"
 #include "WiFiServer.h"
 #include "logging.h"
+#include <arpa/inet.h> //inet_addr
 #include <assert.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <netdb.h>
 
 WiFiClient::WiFiClient(int sock) : psock(sock) {
   if (psock) {
@@ -42,13 +45,47 @@ WiFiClient::WiFiClient(int sock) : psock(sock) {
 }
 
 int WiFiClient::connect(const char *host, uint16_t port) {
-  notImplemented("WiFiClient::connect");
-  return 0;
+  int socket_desc;
+
+  struct hostent *dns = gethostbyname(host);
+  if (!dns) {
+    printf("WiFiClient: Hostname lookup failed %s\n", host);
+    return false;
+  }
+
+  // Create socket
+  int sock = socket(AF_INET, SOCK_STREAM, 0);
+  if (sock == -1) {
+    printf("WiFiClient: Could not create socket\n");
+    return false;
+  }
+
+  struct sockaddr_in server;
+  server.sin_addr = *((struct in_addr *)dns->h_addr);
+  // server.sin_addr.s_addr = inet_addr(host);
+  server.sin_family = AF_INET;
+  server.sin_port = htons(port);
+
+  // Connect to remote server
+  if (::connect(sock, (struct sockaddr *)&server, sizeof(server)) < 0) {
+    printf("WiFiClient: connect error\n");
+    return false;
+  }
+
+  psock = sock;
+  errorCode = 0;
+
+  // turn on nonblock
+  int flags = fcntl(psock, F_GETFL, 0);
+  fcntl(psock, F_SETFL, flags | O_NONBLOCK);
+
+  printf("success!\n");
+  return true;
 }
 
 int WiFiClient::connect(IPAddress ip, uint16_t port) {
-  notImplemented("WiFiClient::connect");
-  return 0;
+  notImplemented("WiFiClient::connect-ipaddr");
+  return false;
 }
 
 size_t WiFiClient::write(uint8_t b) { return write(&b, 1); }
