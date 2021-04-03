@@ -49,14 +49,14 @@ int WiFiClient::connect(const char *host, uint16_t port) {
 
   struct hostent *dns = gethostbyname(host);
   if (!dns) {
-    printf("WiFiClient: Hostname lookup failed %s\n", host);
+    ::printf("WiFiClient: Hostname lookup failed %s\n", host);
     return false;
   }
 
   // Create socket
   int sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock == -1) {
-    printf("WiFiClient: Could not create socket\n");
+    ::printf("WiFiClient: Could not create socket\n");
     return false;
   }
 
@@ -68,7 +68,7 @@ int WiFiClient::connect(const char *host, uint16_t port) {
 
   // Connect to remote server
   if (::connect(sock, (struct sockaddr *)&server, sizeof(server)) < 0) {
-    printf("WiFiClient: connect error\n");
+    ::printf("WiFiClient: connect error\n");
     return false;
   }
 
@@ -79,7 +79,6 @@ int WiFiClient::connect(const char *host, uint16_t port) {
   int flags = fcntl(psock, F_GETFL, 0);
   fcntl(psock, F_SETFL, flags | O_NONBLOCK);
 
-  printf("success!\n");
   return true;
 }
 
@@ -143,8 +142,6 @@ int WiFiClient::read() {
 
 int WiFiClient::read(uint8_t *buf, size_t size) {
   assert(psock);
-  // FIXME - this is super inefficient, instead do block reads from the file
-  // descriptor
   auto r = ::read(psock, buf, size);
   errorCode = errno;
 
