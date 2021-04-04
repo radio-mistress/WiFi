@@ -99,9 +99,7 @@ size_t WiFiClient::write(const uint8_t *buf, size_t size) {
     return 0;
   }
 
-  ::write(psock, buf, size);
-
-  return size;
+  return ::write(psock, buf, size);
 }
 
 int WiFiClient::available() {
@@ -157,7 +155,8 @@ int WiFiClient::peek() {
   return b;
 }
 
-void WiFiClient::flush() { assert(psock); }
+void WiFiClient::flush() {
+}
 
 void WiFiClient::stop() {
   if (!psock)
