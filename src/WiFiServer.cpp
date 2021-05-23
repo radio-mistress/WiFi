@@ -52,6 +52,12 @@ void WiFiServer::begin() {
   psock = portduinoCheckNotNeg(socket(AF_INET, SOCK_STREAM, 0),
                                "error opening socket");
 
+  // allow immediate portnum reuse if our process quits
+  int iSetOption = 1;
+  portduinoCheckNotNeg(setsockopt(psock, SOL_SOCKET, SO_REUSEADDR,
+                                  (char *)&iSetOption, sizeof(iSetOption)),
+                       "can't set reuse addr");
+
   /* Initialize socket structure */
   struct sockaddr_in serv_addr;
   bzero((char *)&serv_addr, sizeof(serv_addr));
@@ -61,22 +67,21 @@ void WiFiServer::begin() {
   serv_addr.sin_port = htons(_port);
 
   /* Now bind the host address using bind() call.*/
-  if (bind(psock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-    portduinoError("failed to bind");
-  } else {
+  portduinoCheckNotNeg(
+      bind(psock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)),
+      "failed to bind");
 
-    /* Now start listening for the clients, here process will
-     * go in sleep mode and will wait for the incoming connection
-     */
+  /* Now start listening for the clients, here process will
+   * go in sleep mode and will wait for the incoming connection
+   */
 
-    portduinoCheckZero(listen(psock, 5), "listen failed");
+  portduinoCheckZero(listen(psock, 5), "listen failed");
 
-    // Turn off blocking on accept()
-    int flags = portduinoCheckNotNeg(fcntl(psock, F_GETFL, 0),
-                                     "socket get flags failed");
-    portduinoCheckNotNeg(fcntl(psock, F_SETFL, flags | O_NONBLOCK),
-                         "socket set non-block failed");
-  }
+  // Turn off blocking on accept()
+  int flags =
+      portduinoCheckNotNeg(fcntl(psock, F_GETFL, 0), "socket get flags failed");
+  portduinoCheckNotNeg(fcntl(psock, F_SETFL, flags | O_NONBLOCK),
+                       "socket set non-block failed");
 }
 
 WiFiClient WiFiServer::available(byte *status) {
