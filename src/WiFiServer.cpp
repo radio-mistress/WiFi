@@ -29,12 +29,12 @@ extern "C" {
 #include "WiFiClient.h"
 #include "WiFiServer.h"
 
+#include <assert.h>
 #include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <assert.h>
 
 WiFiServer::WiFiServer(uint16_t port) { _port = port; }
 
@@ -49,35 +49,33 @@ void WiFiServer::begin() {
   // bind and listen
 
   /* First call to socket() function */
-  psock = socket(AF_INET, SOCK_STREAM, 0);
+  psock = portduinoCheckNotNeg(socket(AF_INET, SOCK_STREAM, 0),
+                               "error opening socket");
 
-  if (psock < 0) {
-    log(SysWifi, LogError, "error opening socket");
-    psock = 0;
+  /* Initialize socket structure */
+  struct sockaddr_in serv_addr;
+  bzero((char *)&serv_addr, sizeof(serv_addr));
+
+  serv_addr.sin_family = AF_INET;
+  serv_addr.sin_addr.s_addr = INADDR_ANY;
+  serv_addr.sin_port = htons(_port);
+
+  /* Now bind the host address using bind() call.*/
+  if (bind(psock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+    portduinoError("failed to bind");
   } else {
-    /* Initialize socket structure */
-    struct sockaddr_in serv_addr;
-    bzero((char *)&serv_addr, sizeof(serv_addr));
 
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = INADDR_ANY;
-    serv_addr.sin_port = htons(_port);
+    /* Now start listening for the clients, here process will
+     * go in sleep mode and will wait for the incoming connection
+     */
 
-    /* Now bind the host address using bind() call.*/
-    if (bind(psock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-      log(SysWifi, LogError, "failed to bind");
-    } else {
+    portduinoCheckZero(listen(psock, 5), "listen failed");
 
-      /* Now start listening for the clients, here process will
-       * go in sleep mode and will wait for the incoming connection
-       */
-
-      listen(psock, 5);
-
-      // Turn off blocking on accept()
-      int flags = fcntl(psock, F_GETFL, 0);
-      fcntl(psock, F_SETFL, flags | O_NONBLOCK);
-    }
+    // Turn off blocking on accept()
+    int flags = portduinoCheckNotNeg(fcntl(psock, F_GETFL, 0),
+                                     "socket get flags failed");
+    portduinoCheckNotNeg(fcntl(psock, F_SETFL, flags | O_NONBLOCK),
+                         "socket set non-block failed");
   }
 }
 
@@ -91,10 +89,14 @@ WiFiClient WiFiServer::available(byte *status) {
 
   /* Accept actual connection from the client */
   int s = accept(psock, (struct sockaddr *)&cli_addr, &clilen);
-
   if (s < 0) {
-    log(SysWifi, LogError, "error on accept");
-    s = 0;
+    if ((errno == ENETDOWN || errno == EPROTO || errno == ENOPROTOOPT ||
+         errno == EHOSTDOWN || errno == EHOSTUNREACH || errno == EOPNOTSUPP ||
+         errno == ENETUNREACH || errno == EWOULDBLOCK)) {
+      s = 0; // harmless error, return a non-connected client instance
+    } else {
+      portduinoCheckNotNeg(s, "accept failed");
+    }
   }
 
   log(SysWifi, LogVerbose, "accept=%d", s);
