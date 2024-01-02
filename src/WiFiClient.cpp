@@ -99,13 +99,7 @@ size_t WiFiClient::write(const uint8_t *buf, size_t size) {
     return 0;
   }
 
-  // return ::write(psock, buf, size);
-  int res = ::send(psock, buf, size, MSG_NOSIGNAL);
-  if (res ==
-      -1) { // Better than write because, we dont want to receive bogus SIGPIPE signals for dropped connections
-    setWriteError();
-    return 0;
-  }
+  return ::write(psock, buf, size);
 }
 
 int WiFiClient::available() {
