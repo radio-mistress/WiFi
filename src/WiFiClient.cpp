@@ -112,7 +112,7 @@ int WiFiClient::available() {
       if (numread < 1) {
         errorCode = errno;
         // EAGAIN means timeout
-        if (errorCode == EAGAIN)
+        if (errorCode == EAGAIN || numread == 0)
           errorCode = 0;
 
         ready = -1;
@@ -143,7 +143,8 @@ int WiFiClient::read() {
 int WiFiClient::read(uint8_t *buf, size_t size) {
   assert(psock);
   auto r = ::read(psock, buf, size);
-  errorCode = errno;
+  if (r < 0)
+    errorCode = errno;
 
   return r;
 }
