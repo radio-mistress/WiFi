@@ -42,6 +42,10 @@ public:
   virtual void stop();
   virtual uint8_t connected();
   virtual operator bool();
+  virtual IPAddress remoteIP() const;
+  virtual uint16_t remotePort() const;
+  virtual IPAddress localIP() const;
+  virtual uint16_t localPort() const;
 
   friend class WiFiServer;
 
