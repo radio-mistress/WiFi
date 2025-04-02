@@ -2,7 +2,7 @@
     "name": "WiFi",
     "version": "0.0.1",
     "description": "Portduino framework",
-    "url": "https://github.com/radiomistress/framework-portduino",
+    "url": "https://github.com/radio-mistress/WiFi",
     "dependencies": {
       "wifi": "latest"
 }
